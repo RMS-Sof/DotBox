@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dots and Boxes Game</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            width: 300px;
+            margin-bottom: 20px;
+        }
+        
+        .player {
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .active {
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+        }
+        
+        #player1 {
+            background-color: #ff7f7f;
+        }
+        
+        #player2 {
+            background-color: #7fbfff;
+        }
+        
+        .game-container {
+            position: relative;
+            margin: 20px;
+        }
+        
+        .dot {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background-color: #333;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .line {
+            position: absolute;
+            background-color: #ccc;
+            transition: background-color 0.2s;
+            cursor: pointer;
+        }
+        
+        .line:hover {
+            background-color: #999;
+        }
+        
+        .horizontal {
+            height: 6px;
+            transform: translateY(-3px);
+        }
+        
+        .vertical {
+            width: 6px;
+            transform: translateX(-3px);
+        }
+        
+        .line.player1 {
+            background-color: #ff4040;
+        }
+        
+        .line.player2 {
+            background-color: #4080ff;
+        }
+        
+        .square {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            transform: translate(0, 0);
+            opacity: 0.5;
+        }
+        
+        .square.player1 {
+            background-color: #ff7f7f;
+        }
+        
+        .square.player2 {
+            background-color: #7fbfff;
+        }
+        
+        .reset-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .reset-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Dots and Boxes</h1>
+    
+    <div class="game-info">
+        <div id="player1" class="player active">Player 1: <span id="score1">0</span></div>
+        <div id="player2" class="player">Player 2: <span id="score2">0</span></div>
+    </div>
+    
+    <div class="game-container" id="game"></div>
+    
+    <button class="reset-btn" onclick="resetGame()">Reset Game</button>
+    
+    <script>
+        // Game Configuration
+        const gridSize = 5; // 5x5 grid (6x6 dots)
+        const cellSize = 50; // pixels
+        const dotSize = 12; // pixels
+        
+        // Game State
+        let currentPlayer = 1;
+        let player1Score = 0;
+        let player2Score = 0;
+        const lines = [];
+        const squares = [];
+        
+        // Initialize the game board
+        function initGame() {
+            const gameContainer = document.getElementById('game');
+            gameContainer.style.width = `${gridSize * cellSize + dotSize}px`;
+            gameContainer.style.height = `${gridSize * cellSize + dotSize}px`;
+            
+            // Create dots
+            for (let y = 0; y <= gridSize; y++) {
+                for (let x = 0; x <= gridSize; x++) {
+                    const dot = document.createElement('div');
+                    dot.className = 'dot';
+                    dot.style.left = `${x * cellSize}px`;
+                    dot.style.top = `${y * cellSize}px`;
+                    gameContainer.appendChild(dot);
+                }
+            }
+            
+            // Create horizontal lines
+            for (let y = 0; y <= gridSize; y++) {
+                for (let x = 0; x < gridSize; x++) {
+                    const line = document.createElement('div');
+                    line.className = 'line horizontal';
+                    line.style.left = `${x * cellSize + dotSize/2}px`;
+                    line.style.top = `${y * cellSize}px`;
+                    line.style.width = `${cellSize - dotSize}px`;
+                    line.dataset.x = x;
+                    line.dataset.y = y;
+                    line.dataset.type = 'h';
+                    line.addEventListener('click', handleLineClick);
+                    gameContainer.appendChild(line);
+                    lines.push({
+                        element: line,
+                        x: x,
+                        y: y,
+                        type: 'h',
+                        selected: false
+                    });
+                }
+            }
+            
+            // Create vertical lines
+            for (let y = 0; y < gridSize; y++) {
+                for (let x = 0; x <= gridSize; x++) {
+                    const line = document.createElement('div');
+                    line.className = 'line vertical';
+                    line.style.left = `${x * cellSize}px`;
+                    line.style.top = `${y * cellSize + dotSize/2}px`;
+                    line.style.height = `${cellSize - dotSize}px`;
+                    line.dataset.x = x;
+                    line.dataset.y = y;
+                    line.dataset.type = 'v';
+                    line.addEventListener('click', handleLineClick);
+                    gameContainer.appendChild(line);
+                    lines.push({
+                        element: line,
+                        x: x,
+                        y: y,
+                        type: 'v',
+                        selected: false
+                    });
+                }
+            }
+            
+            // Create square placeholders
+            for (let y = 0; y < gridSize; y++) {
+                for (let x = 0; x < gridSize; x++) {
+                    const square = document.createElement('div');
+                    square.className = 'square';
+                    square.style.left = `${x * cellSize + dotSize/2}px`;
+                    square.style.top = `${y * cellSize + dotSize/2}px`;
+                    square.style.width = `${cellSize - dotSize}px`;
+                    square.style.height = `${cellSize - dotSize}px`;
+                    square.dataset.x = x;
+                    square.dataset.y = y;
+                    square.style.display = 'none';
+                    gameContainer.appendChild(square);
+                    squares.push({
+                        element: square,
+                        x: x,
+                        y: y,
+                        completed: false,
+                        owner: null
+                    });
+                }
+            }
+        }
+        
+        // Handle line click event
+        function handleLineClick(event) {
+            const line = event.target;
+            const x = parseInt(line.dataset.x);
+            const y = parseInt(line.dataset.y);
+            const type = line.dataset.type;
+            
+            // Find the line in our state
+            const lineObj = lines.find(l => l.x === x && l.y === y && l.type === type);
+            
+            // If line is already selected, do nothing
+            if (lineObj.selected) {
+                return;
+            }
+            
+            // Mark line as selected
+            lineObj.selected = true;
+            line.classList.add(`player${currentPlayer}`);
+            
+            // Check if any squares are completed
+            let squareCompleted = false;
+            
+            if (type === 'h') {
+                // Check square above (if exists)
+                if (y > 0) {
+                    squareCompleted = checkSquare(x, y - 1) || squareCompleted;
+                }
+                // Check square below (if exists)
+                if (y < gridSize) {
+                    squareCompleted = checkSquare(x, y) || squareCompleted;
+                }
+            } else { // vertical
+                // Check square to the left (if exists)
+                if (x > 0) {
+                    squareCompleted = checkSquare(x - 1, y) || squareCompleted;
+                }
+                // Check square to the right (if exists)
+                if (x < gridSize) {
+                    squareCompleted = checkSquare(x, y) || squareCompleted;
+                }
+            }
+            
+            // Switch player if no square was completed
+            if (!squareCompleted) {
+                switchPlayer();
+            } else {
+                // Update score
+                if (currentPlayer === 1) {
+                    player1Score++;
+                    document.getElementById('score1').textContent = player1Score;
+                } else {
+                    player2Score++;
+                    document.getElementById('score2').textContent = player2Score;
+                }
+                
+                // Check if game is over
+                if (checkGameOver()) {
+                    setTimeout(() => {
+                        const winner = player1Score > player2Score ? 1 : (player2Score > player1Score ? 2 : 'Tie');
+                        if (winner === 'Tie') {
+                            alert("Game Over! It's a tie!");
+                        } else {
+                            alert(`Game Over! Player ${winner} wins!`);
+                        }
+                    }, 100);
+                }
+            }
+        }
+        
+        // Check if a square is completed
+        function checkSquare(x, y) {
+            const square = squares.find(s => s.x === x && s.y === y);
+            if (square.completed) {
+                return false;
+            }
+            
+            // Check if all four sides are selected
+            const topLine = lines.find(l => l.x === x && l.y === y && l.type === 'h');
+            const bottomLine = lines.find(l => l.x === x && l.y === y + 1 && l.type === 'h');
+            const leftLine = lines.find(l => l.x === x && l.y === y && l.type === 'v');
+            const rightLine = lines.find(l => l.x === x + 1 && l.y === y && l.type === 'v');
+            
+            if (topLine.selected && bottomLine.selected && leftLine.selected && rightLine.selected) {
+                // Square is completed
+                square.completed = true;
+                square.owner = currentPlayer;
+                square.element.style.display = 'block';
+                square.element.classList.add(`player${currentPlayer}`);
+                return true;
+            }
+            
+            return false;
+        }
+        
+        // Switch player
+        function switchPlayer() {
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            document.getElementById('player1').classList.toggle('active');
+            document.getElementById('player2').classList.toggle('active');
+        }
+        
+        // Check if the game is over
+        function checkGameOver() {
+            return squares.every(square => square.completed);
+        }
+        
+        // Reset the game
+        function resetGame() {
+            // Reset game state
+            currentPlayer = 1;
+            player1Score = 0;
+            player2Score = 0;
+            
+            // Update UI
+            document.getElementById('score1').textContent = '0';
+            document.getElementById('score2').textContent = '0';
+            document.getElementById('player1').classList.add('active');
+            document.getElementById('player2').classList.remove('active');
+            
+            // Reset lines
+            lines.forEach(line => {
+                line.selected = false;
+                line.element.className = line.type === 'h' ? 'line horizontal' : 'line vertical';
+            });
+            
+            // Reset squares
+            squares.forEach(square => {
+                square.completed = false;
+                square.owner = null;
+                square.element.style.display = 'none';
+                square.element.className = 'square';
+            });
+        }
+        
+        // Initialize the game
+        initGame();
+    </script>
+</body>
+</html>
